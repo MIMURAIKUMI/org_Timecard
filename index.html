@@ -14,8 +14,8 @@
     --bg:#F3F7FC; --panel:#FFFFFF; --panel2:#EEF5FB;
     --line:#E4EEF8; --lineS:#CFE1F3;
     --text:#2B2A3A; --dim:#8A8CA0; --faint:#BFC6D6;
-    --brass:#FF9EC7; --brassDim:#F17FB2;
-    --gray:#AACBE6; --paleblue:#BFE6FA;
+    --brass:#FF9EC7; --brassDim:#F17FB2; --brassDark:#E0559A;
+    --gray:#AACBE6; --paleblue:#BFE6FA; --palepink:#FCE7F1;
     --teal:#4FAE72; --rust:#E8746B; --blue:#7FB3DC;
     --ink:#2B2A3A; --pix:2px; --sh:3px;
   }
@@ -98,9 +98,10 @@
   .empty{padding:24px; text-align:center; color:var(--faint); font-size:13px;}
   .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:5px;}
   .cal-head{font-size:10px; color:var(--dim); text-align:center; padding-bottom:6px; font-family:'JetBrains Mono',monospace; font-weight:700;}
-  .cal-cell{background:var(--panel2); border-radius:9px; padding:5px 4px; min-height:58px; display:flex; flex-direction:column; gap:2px; border:2px solid var(--line);}
-  .cal-cell.blank{background:none; border-color:transparent;}
-  .cal-cell.today{border-color:var(--brassDim); box-shadow:2px 2px 0 rgba(255,158,199,0.3);}
+  .cal-cell{background:var(--panel2); border-radius:9px; padding:5px 4px; min-height:58px; display:flex; flex-direction:column; gap:2px; border:2px solid var(--line); cursor:pointer;}
+  .cal-cell.blank{background:none; border-color:transparent; cursor:default;}
+  .cal-cell.today{border-color:var(--brassDim); background:var(--palepink); box-shadow:2px 2px 0 rgba(255,158,199,0.3);}
+  .cal-cell.selected{border-color:var(--brassDark); background:var(--panel2); box-shadow:2px 2px 0 rgba(224,85,154,0.4);}
   .cal-day{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--faint);}
   .cal-hrs{font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; color:var(--text);}
   .cal-profit{font-family:'JetBrains Mono',monospace; font-size:9px;}
@@ -156,6 +157,8 @@ let showLocForm = false;
 let editingRecordDate = null; // for segment-edit modal
 let editingSessionId = null;
 let editingSegmentsDraft = null;
+let editingCurrentStartDraft = null; // HH:MM draft for an in-progress session's start time
+let selectedReportDate = null; // date selected on Summary calendar
 let showAddRecord = false;
 let showArchived = false;
 let addDraft = null; // {date, locationId, transportCost, reimbursed, segments:[{start,end}]}
@@ -424,6 +427,13 @@ function hmLabel(ms){
   const h = Math.floor(totalMin/60), m = totalMin%60;
   return h>0 ? `${h}時間${m}分` : `${m}分`;
 }
+function goalLineText(ms, goalHours, locName, escape){
+  const goalMs = goalHours*3600000;
+  const remainMs = Math.max(0, goalMs - ms);
+  const end = new Date(Date.now() + remainMs);
+  const name = escape ? escapeHtml(locName||'') : (locName||'');
+  return `${hmLabel(ms)} / ${pad(end.getHours())}：${pad(end.getMinutes())}に終了予定（${name}）`;
+}
 function renderPunch(today, todayStr, weekday, suggested){
   const todaySessions = records[todayStr] || [];
   const activeSession = todaySessions.find(s=> s.status==='working' || s.status==='paused');
@@ -489,7 +499,7 @@ function renderPunch(today, todayStr, weekday, suggested){
       <div class="catwalk ${status==='working'?'walking':''}" style="left:${percent}%;">${catSprite(1.8)}</div>
       <div class="progresstrack"><div class="progressfill" style="width:${percent}%;"></div></div>
     </div>
-    <div class="goalline">${hmLabel(money.ms)} / ${goalHours%1===0?goalHours:goalHours.toFixed(1)}時間（${escapeHtml(currentLoc?currentLoc.name:'')}）</div>
+    <div class="goalline">${goalLineText(money.ms, goalHours, currentLoc?currentLoc.name:'', true)}</div>
     ${buttonsHtml}
   </div>`;
 
@@ -504,16 +514,18 @@ function renderPunch(today, todayStr, weekday, suggested){
 }
 
 function renderSessionCard(s, todayStr){
+  const canEditTimes = s.segments.length>0 || s.status==='working';
   return `<div class="panel" style="padding:18px;margin-bottom:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${s.segments.length?'10px':'0'};">
         <div style="font-size:12px;color:var(--dim);display:flex;align-items:center;gap:6px;">
           <span class="dot-sm" style="background:${locColor(s.locationId)};"></span>${escapeHtml(s.locationName)}${s.status!=='done'?'（進行中）':''}
         </div>
-        ${s.segments.length? `<div style="display:flex;gap:6px;">
+        ${canEditTimes? `<div style="display:flex;gap:6px;">
           <button onclick="openRecordEdit('${todayStr}','${s.id}')" style="background:none;border:1px solid var(--line);color:var(--dim);border-radius:7px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:inherit;">✎ 時間を編集</button>
-          <button onclick="openDuplicate('${todayStr}','${s.id}')" style="background:none;border:1px solid var(--line);color:var(--dim);border-radius:7px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:inherit;">⧉ 複製</button>
+          ${s.segments.length? `<button onclick="openDuplicate('${todayStr}','${s.id}')" style="background:none;border:1px solid var(--line);color:var(--dim);border-radius:7px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:inherit;">⧉ 複製</button>` : ''}
         </div>` : ''}
       </div>
+      ${s.status==='working' && s.currentStart? `<div class="seg mono"><span>${fmtTime(s.currentStart)} – 進行中</span></div>` : ''}
       ${s.segments.length? `<div>
         ${s.segments.map(seg=>`<div class="seg mono"><span>${fmtTime(seg.start)} – ${fmtTime(seg.end)}</span><span style="color:var(--faint);">(${msToHMS(new Date(seg.end)-new Date(seg.start))})</span></div>`).join('')}
       </div>` : ''}
@@ -614,12 +626,14 @@ function openRecordEdit(date, sessionId){
   editingRecordDate = date;
   editingSessionId = sessionId;
   editingSegmentsDraft = s.segments.map(seg=>({start:fmtTime(seg.start), end:fmtTime(seg.end)}));
+  editingCurrentStartDraft = (s.status==='working' && s.currentStart) ? fmtTime(s.currentStart) : null;
   render();
 }
-function closeRecordEdit(){ editingRecordDate=null; editingSessionId=null; editingSegmentsDraft=null; render(); }
+function closeRecordEdit(){ editingRecordDate=null; editingSessionId=null; editingSegmentsDraft=null; editingCurrentStartDraft=null; render(); }
 function updateSegDraft(idx, field, value){ editingSegmentsDraft[idx][field]=value; }
 function addSegDraft(){ editingSegmentsDraft.push({start:'09:00', end:'10:00'}); render(); }
 function removeSegDraft(idx){ editingSegmentsDraft.splice(idx,1); render(); }
+function updateCurrentStartDraft(value){ editingCurrentStartDraft = value; }
 function saveRecordEdit(){
   const date = editingRecordDate;
   const s = (records[date]||[]).find(x=>x.id===editingSessionId);
@@ -633,9 +647,17 @@ function saveRecordEdit(){
     }
     segments.push({start, end});
   }
+  if(editingCurrentStartDraft!==null && s.status==='working'){
+    const newStart = localToISO(date, editingCurrentStartDraft);
+    if(new Date(newStart) > new Date()){
+      alert('開始時刻は現在時刻より後にはできません');
+      return;
+    }
+    s.currentStart = newStart;
+  }
   s.segments = segments;
   persistRecords();
-  editingRecordDate = null; editingSessionId = null; editingSegmentsDraft = null;
+  editingRecordDate = null; editingSessionId = null; editingSegmentsDraft = null; editingCurrentStartDraft = null;
   render();
 }
 function renderRecordEditModal(){
@@ -647,6 +669,11 @@ function renderRecordEditModal(){
       <div class="modal" onclick="event.stopPropagation()">
         <div style="font-weight:700;font-size:15px;margin-bottom:4px;">打刻時間を編集</div>
         <div class="mono" style="font-size:12px;color:var(--faint);margin-bottom:14px;">${date}　${escapeHtml(s.locationName)}</div>
+        ${editingCurrentStartDraft!==null? `
+        <div class="field">
+          <label>進行中の開始時刻</label>
+          <input type="time" value="${editingCurrentStartDraft}" oninput="updateCurrentStartDraft(this.value)">
+        </div>` : ''}
         ${editingSegmentsDraft.map((seg,idx)=>`
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
             <input type="time" value="${seg.start}" style="flex:1;" oninput="updateSegDraft(${idx},'start',this.value)">
@@ -906,14 +933,16 @@ function renderCalendar(rows, reportMonth){
     const dateStr = `${y}-${pad(m)}-${pad(d)}`;
     const info = byDate[dateStr];
     const isToday = dateStr === todayStr;
+    const isSelected = dateStr === selectedReportDate;
+    const cellCls = `cal-cell ${isToday?'today':''} ${isSelected?'selected':''}`;
     if(!info){
-      return `<div class="cal-cell ${isToday?'today':''}"><div class="cal-day">${d}</div></div>`;
+      return `<div class="${cellCls}" onclick="selectReportDate('${dateStr}')"><div class="cal-day">${d}</div></div>`;
     }
     const dots = [...info.locIds].map(id=>{
       const idx = Math.max(0, locations.findIndex(l=>l.id===id));
       return `<span class="cal-dot" style="background:${locColor(id)};"></span>`;
     }).join('');
-    return `<div class="cal-cell ${isToday?'today':''}">
+    return `<div class="${cellCls}" onclick="selectReportDate('${dateStr}')">
       <div class="cal-day">${d}</div>
       <div class="cal-hrs">${info.hrs.toFixed(1)}h</div>
       <div class="cal-profit" style="color:${info.profit>=0?'var(--teal)':'var(--rust)'};">${yenCompact(info.profit)}</div>
@@ -998,11 +1027,18 @@ function renderReport(){
     </div>`;
   }
 
+  const displayRows = selectedReportDate ? rows.filter(r=>r.date===selectedReportDate) : rows;
+
+  html += `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+    <div style="font-size:12px;color:var(--dim);">${selectedReportDate ? escapeHtml(selectedReportDate)+' の記録' : 'すべての記録'}</div>
+    ${selectedReportDate ? `<button onclick="selectReportDate('${selectedReportDate}')" style="background:none;border:1px solid var(--line);color:var(--dim);border-radius:7px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:inherit;">✕ 選択解除</button>` : ''}
+  </div>`;
+
   html += `<div class="panel" style="padding:4px;"><div class="tbl-wrap"><table>
     <thead><tr>${['日付','勤務先','工数','収入','交通費','支出','利益','精算','','',''].map(h=>`<th>${h}</th>`).join('')}</tr></thead>
     <tbody>
-      ${rows.length===0? `<tr><td colspan="11" style="text-align:center;color:var(--faint);padding:20px;">この月の記録はありません</td></tr>` :
-        rows.map(r=>`
+      ${displayRows.length===0? `<tr><td colspan="11" style="text-align:center;color:var(--faint);padding:20px;">${selectedReportDate?'この日の記録はありません':'この月の記録はありません'}</td></tr>` :
+        displayRows.map(r=>`
         <tr>
           <td class="mono">${r.date.slice(5)}</td>
           <td><span class="dot-sm" style="background:${locColor(r.locationId)};"></span>${escapeHtml(r.locationName)}</td>
@@ -1025,6 +1061,11 @@ function changeMonth(delta){
   const [y,m] = reportMonth.split('-').map(Number);
   const d = new Date(y, m-1+delta, 1);
   reportMonth = `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+  selectedReportDate = null;
+  render();
+}
+function selectReportDate(dateStr){
+  selectedReportDate = (selectedReportDate===dateStr) ? null : dateStr;
   render();
 }
 function updateTransport(date, sessionId, value){
@@ -1060,7 +1101,7 @@ function tickClock(){
   const cat = document.querySelector('.catwalk');
   if(cat) cat.style.left = percent+'%';
   const gl = document.querySelector('.goalline');
-  if(gl) gl.textContent = `${hmLabel(ms)} / ${goalHours%1===0?goalHours:goalHours.toFixed(1)}時間（${loc?loc.name:''}）`;
+  if(gl) gl.textContent = goalLineText(ms, goalHours, loc?loc.name:'', false);
 }
 setInterval(tickClock, 1000);
 render();
