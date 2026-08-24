@@ -112,38 +112,6 @@
   ::-webkit-scrollbar{height:6px; width:6px;}
   ::-webkit-scrollbar-thumb{background:var(--lineS); border-radius:4px;}
   @keyframes catBob{ 0%,100%{transform:translateX(-30%) translateY(0);} 50%{transform:translateX(-30%) translateY(-3px);} }
-
-  /* ==== ここから: 自作デバイス(240x240 SPI液晶+タクトスイッチ3個)向け追加スタイル ==== */
-  /* タッチ非対応液晶なので、フォーカス中の要素をはっきり見せる（ボタン操作の目印） */
-  #app button:focus-visible,
-  #app input:focus-visible,
-  #app select:focus-visible{
-    outline: 3px solid var(--brassDark);
-    outline-offset: 2px;
-    box-shadow: 0 0 0 5px rgba(224,85,154,0.25);
-  }
-  /* 画面幅が260px以下＝この液晶そのものの想定。詰めて全部入るようにする */
-  @media (max-width:260px){
-    #app{padding:8px 6px 70px; max-width:none;}
-    header{margin-bottom:6px;}
-    .eyebrow{font-size:9px; letter-spacing:1px;}
-    nav{gap:3px; margin-bottom:8px;}
-    nav button{padding:6px 2px; font-size:9px; border-radius:7px;}
-    .card-punch{padding:10px;}
-    .clock{font-size:18px; margin:4px 0 2px;}
-    .goalline{font-size:8px; margin-bottom:8px;}
-    .bigbtn{padding:10px 2px; font-size:11px; border-radius:9px;}
-    .metrics{gap:5px;}
-    .metric{padding:6px 7px;}
-    .metric .lbl{font-size:8px;}
-    .metric .val{font-size:11px;}
-    .projchip{padding:5px 8px; font-size:10px;}
-    .panel{border-radius:10px;}
-    table{font-size:9px;}
-    th,td{padding:5px 4px;}
-    .modal{padding:12px;}
-  }
-  /* ==== 追加スタイルここまで ==== */
 </style>
 
 
@@ -196,10 +164,6 @@ let showAddRecord = false;
 let showArchived = false;
 let addDraft = null; // {date, locationId, transportCost, reimbursed, segments:[{start,end}]}
 let showDuplicate = false;
-// ---- 休憩タイマー ----
-let breakTimer = { running:false, endsAt:0, finishedAt:0 };
-let lastAlarmPing = 0;
-let audioCtx = null;
 let duplicateSource = null; // {locationId, locationName, hourlyRevenue, hourlyExpense, transportCost, segmentsTimes}
 let duplicateTargetDate = null;
 
@@ -208,7 +172,6 @@ function pad(n){ return String(n).padStart(2,'0'); }
 function fmtDate(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 function fmtTime(iso){ const d=new Date(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
 function msToHMS(ms){ const s=Math.max(0,Math.floor(ms/1000)); const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60; return `${pad(h)}:${pad(m)}:${pad(sec)}`; }
-function msToMMSS(ms){ const s=Math.max(0,Math.ceil(ms/1000)); const m=Math.floor(s/60),sec=s%60; return `${pad(m)}:${pad(sec)}`; }
 function yen(n){ return `¥${Math.round(n).toLocaleString('ja-JP')}`; }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -315,89 +278,6 @@ function doEnd(dateKey, sessionId){
   }
   s.currentStart = null; s.status='done';
   persistRecords(); render();
-}
-
-// ---------- 休憩タイマー ----------
-function unlockAudio(){
-  if(!audioCtx){
-    try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; }
-  }
-  if(audioCtx.state==='suspended'){ audioCtx.resume(); }
-}
-// キー入力(=物理ボタン操作)のたびにAudioContextを起こしておく。
-// ブラウザの自動再生制限で「ユーザー操作なしに音を鳴らす」ことができないため。
-document.addEventListener('keydown', unlockAudio);
-
-function beep(freq, durMs, delaySec){
-  if(!audioCtx) return;
-  const t0 = audioCtx.currentTime + (delaySec||0);
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.type = 'sine';
-  osc.frequency.value = freq;
-  gain.gain.setValueAtTime(0.0001, t0);
-  gain.gain.exponentialRampToValueAtTime(0.35, t0+0.01);
-  gain.gain.exponentialRampToValueAtTime(0.0001, t0+durMs/1000);
-  osc.connect(gain).connect(audioCtx.destination);
-  osc.start(t0);
-  osc.stop(t0+durMs/1000+0.03);
-}
-function playAlarmPattern(){
-  unlockAudio();
-  if(!audioCtx) return;
-  beep(880, 220, 0);
-  beep(880, 220, 0.3);
-  beep(1046, 320, 0.6);
-}
-function startBreak(minutes){
-  unlockAudio();
-  breakTimer = { running:true, endsAt: Date.now()+minutes*60000, finishedAt:0 };
-  render();
-}
-function cancelBreak(){
-  breakTimer = { running:false, endsAt:0, finishedAt:0 };
-  render();
-}
-function dismissBreakAlarm(){
-  breakTimer = { running:false, endsAt:0, finishedAt:0 };
-  render();
-}
-function breakTick(){
-  const now = Date.now();
-  if(breakTimer.running && now >= breakTimer.endsAt){
-    breakTimer.running = false;
-    breakTimer.finishedAt = now;
-    lastAlarmPing = 0;
-    render();
-  }
-  if(breakTimer.finishedAt){
-    if(now - lastAlarmPing > 4000){ playAlarmPattern(); lastAlarmPing = now; }
-  }
-  if(tab==='punch' && breakTimer.running){
-    const el = document.getElementById('breakClockDisplay');
-    if(el) el.textContent = msToMMSS(breakTimer.endsAt - now);
-  }
-}
-function renderBreakWidget(){
-  if(breakTimer.running){
-    return `<div class="panel" style="padding:14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
-      <div style="font-size:12px;color:var(--dim);flex-shrink:0;">☕ 休憩中</div>
-      <div class="mono" id="breakClockDisplay" style="font-size:17px;font-weight:700;flex:1;text-align:center;">${msToMMSS(breakTimer.endsAt - Date.now())}</div>
-      <button class="icobtn" onclick="cancelBreak()" title="やめる">✕</button>
-    </div>`;
-  }
-  if(breakTimer.finishedAt){
-    return `<div class="panel" style="padding:14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;background:var(--palepink);">
-      <div style="font-size:12px;color:var(--rust);">🔔 休憩、おわり!</div>
-      <button class="bigbtn primary" style="flex:none;padding:8px 14px;" onclick="dismissBreakAlarm()">OK</button>
-    </div>`;
-  }
-  return `<div class="panel" style="padding:12px 14px;margin-bottom:16px;">
-    <div style="font-size:11px;color:var(--dim);margin-bottom:8px;">☕ 休憩タイマー</div>
-    <div class="projlist" style="margin:0;">
-      ${[5,10,15,20,30].map(m=>`<div class="projchip" onclick="startBreak(${m})">${m}分</div>`).join('')}
-    </div>
-  </div>`;
 }
 
 // ---------- render ----------
@@ -628,8 +508,6 @@ function renderPunch(today, todayStr, weekday, suggested){
     html += renderSessionCard(activeSession, todayStr);
   }
   otherSessions.slice().reverse().forEach(s=>{ html += renderSessionCard(s, todayStr); });
-
-  html += renderBreakWidget();
 
   html += renderTodayStackedBar(todaySessions);
 
@@ -1226,40 +1104,7 @@ function tickClock(){
   const gl = document.querySelector('.goalline');
   if(gl) gl.textContent = goalLineText(ms, goalHours, loc?loc.name:'', false);
 }
-// ==== ここから: 3ボタン操作サポート ====
-// Tab=次のボタン/入力欄へフォーカス移動、Enter=決定(クリック)、PageDown=画面スクロール
-// は全部ブラウザ標準の挙動なので、独自のキー処理は基本的に不要。
-// ここでは「毎回innerHTMLを丸ごと描き直す」このアプリの都合上、
-// 再描画のたびにフォーカスが失われてTabが振り出しに戻ってしまう点だけ補助する。
-(function(){
-  function isVisible(el){
-    if(!el || el.disabled) return false;
-    const r = el.getBoundingClientRect();
-    return r.width>0 && r.height>0;
-  }
-  function focusables(){
-    const scope = document.querySelector('.modal') ? '.modal' : '#app';
-    return Array.from(document.querySelectorAll(scope+' button, '+scope+' input, '+scope+' select'))
-      .filter(isVisible);
-  }
-  // render()で何かに元々フォーカスがあった場合だけ、先頭要素に戻す
-  // (フォーカスが無い状態=まだTabで触っていない状態はそのまま何もしない)
-  const originalRender = render;
-  render = function(){
-    const hadFocus = document.activeElement && document.activeElement !== document.body;
-    originalRender();
-    if(hadFocus){
-      requestAnimationFrame(function(){
-        const list = focusables();
-        if(list.length) list[0].focus();
-      });
-    }
-  };
-})();
-// ==== 追加ここまで ====
-
 setInterval(tickClock, 1000);
-setInterval(breakTick, 1000);
 render();
 </script>
 </body>
