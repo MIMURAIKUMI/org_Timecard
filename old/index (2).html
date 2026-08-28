@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Timecard</title>
+<link rel="apple-touch-icon" href="./icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#FBF4F7">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DotGothic16&family=Press+Start+2P&family=JetBrains+Mono:wght@400;500;700&display=swap');
+  :root{
+    --bg:#F3F7FC; --panel:#FFFFFF; --panel2:#EEF5FB;
+    --line:#E4EEF8; --lineS:#CFE1F3;
+    --text:#2B2A3A; --dim:#8A8CA0; --faint:#BFC6D6;
+    --brass:#FF9EC7; --brassDim:#F17FB2; --brassDark:#E0559A; --pinkLine:#F5E0EA;
+    --gray:#AACBE6; --paleblue:#BFE6FA; --palepink:#FDEEF5;
+    --teal:#4FAE72; --rust:#E8746B; --blue:#7FB3DC;
+    --ink:#2B2A3A; --pix:2px; --sh:3px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--text); font-family:'DotGothic16',sans-serif; -webkit-font-smoothing:antialiased;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  .pixnum{font-family:'Press Start 2P',monospace;}
+  #app{max-width:880px; margin:0 auto; padding:calc(20px + env(safe-area-inset-top)) 16px 90px;}
+  header{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;}
+  .eyebrow{font-family:'Press Start 2P',monospace; font-size:15px; letter-spacing:2px; color:var(--brass); margin-bottom:0; text-shadow:2px 2px 0 var(--lineS);}
+  .panel{background:var(--panel); border:var(--pix) solid var(--lineS); border-radius:16px; box-shadow: var(--sh) var(--sh) 0 var(--line);}
+  nav{display:flex; gap:6px; margin-bottom:18px;}
+  nav button{padding:9px 10px; background:var(--panel2); cursor:pointer; color:var(--dim); font-size:12px; font-weight:600; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:5px; border:2px solid var(--lineS); border-radius:10px; box-shadow:2px 2px 0 var(--line); transition:transform .08s ease, box-shadow .08s ease; flex:1;}
+  nav button.active{color:#fff; background:var(--brass); border-color:var(--brassDim);}
+  nav button:active{transform:translate(2px,2px); box-shadow:0 0 0 var(--line);}
+  .status-dot{display:inline-flex; align-items:center; gap:8px;}
+  .status-dot .dot{width:9px; height:9px; border-radius:3px;}
+  select,input{width:100%; background:var(--panel2); border:2px solid var(--lineS); border-radius:9px; color:var(--text); padding:9px 10px; font-size:14px; font-family:inherit;}
+  .card-punch{padding:22px; position:relative; overflow:hidden; margin-bottom:16px;}
+  .clock{text-align:center; font-size:34px; font-weight:700; letter-spacing:1px; margin:6px 0 4px; font-family:'Press Start 2P',monospace; color:var(--text);}
+  .goalline{text-align:center; font-size:11px; color:var(--dim); margin-bottom:14px; font-family:'JetBrains Mono',monospace;}
+  .btnrow{display:flex; gap:10px;}
+  .bigbtn{flex:1; padding:16px 4px; border-radius:14px; cursor:pointer; font-family:inherit; font-size:15px; font-weight:700; border:2px solid var(--lineS); box-shadow:3px 3px 0 var(--line); transition:transform .08s ease, box-shadow .08s ease;}
+  .bigbtn:active{transform:translate(3px,3px); box-shadow:0 0 0 var(--line);}
+  .bigbtn.primary{background:var(--brass); color:#fff; border-color:var(--brassDim); box-shadow:3px 3px 0 rgba(255,158,199,0.4);}
+  .bigbtn.secondary{background:var(--panel); color:var(--dim);}
+  .bigbtn.pale{background:var(--paleblue); color:var(--text); border-color:#8FCBEA;}
+  .projlist{display:flex; flex-wrap:wrap; gap:8px; margin:16px 0;}
+  .projchip{display:flex; align-items:center; gap:6px; padding:8px 12px; border-radius:10px; background:var(--panel2); border:2px solid var(--lineS); font-size:12px; font-weight:600; color:var(--text); cursor:pointer; box-shadow:2px 2px 0 var(--line);}
+  .projchip .sq{width:9px; height:9px; border-radius:3px; flex-shrink:0;}
+  .projchip.selected{border-color:var(--brassDim); box-shadow:2px 2px 0 rgba(255,158,199,0.35);}
+  .projchip.running{color:#fff; box-shadow:2px 2px 0 var(--line);}
+  .projchip.grayout{opacity:0.4;}
+  .progresswrap{position:relative; margin:45px 0 7px;}
+  .progresstrack{height:14px; background:var(--panel2); border-radius:999px; border:2px solid var(--lineS); overflow:hidden;}
+  .progressfill{height:100%; background:var(--brass); border-radius:999px;}
+  .catwalk{position:absolute; top:-37px; transform:translateX(-30%); transition:left .3s ease;}
+  .catwalk.walking{animation:catBob 0.5s steps(2) infinite;}
+  .punchbtn{flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; padding:14px 4px; border-radius:12px; cursor:pointer; background:var(--panel2); border:2px solid var(--lineS); color:var(--dim); font-family:inherit; box-shadow:2px 2px 0 var(--line); transition:transform .08s ease, box-shadow .08s ease;}
+  .punchbtn:active{transform:translate(2px,2px); box-shadow:0 0 0 var(--line);}
+  .punchbtn.active{background:var(--c,var(--brass)); background:color-mix(in srgb, var(--c,var(--brass)) 20%, var(--panel)); border-color:var(--c,var(--brass)); color:var(--c,var(--brass));}
+  .punchbtn:disabled{opacity:.4; cursor:default; box-shadow:none; transform:none;}
+  .punchbtn svg{width:18px; height:18px;}
+  .punchbtn span{font-size:11px; font-weight:600;}
+  .metrics{display:grid; grid-template-columns:repeat(3,1fr); gap:10px;}
+  .metric{background:var(--panel2); border-radius:10px; padding:10px 12px; border:2px solid var(--lineS); box-shadow:2px 2px 0 var(--line);}
+  .metric .lbl{font-size:10px; color:var(--dim); margin-bottom:4px;}
+  .metric .val{font-size:14px; font-weight:700; font-family:'JetBrains Mono',monospace;}
+  .seg{font-size:12px; color:var(--dim); margin-bottom:4px; display:flex; gap:8px;}
+  .banner{padding:14px; margin-bottom:16px; border:var(--pix) solid var(--rust); border-radius:14px; background:var(--panel); box-shadow: var(--sh) var(--sh) 0 rgba(232,116,107,0.18);}
+  .locrow{padding:14px; margin-bottom:12px;}
+  .loc-name{font-weight:700; font-size:15px;}
+  .dot-sm{width:9px; height:9px; border-radius:3px; display:inline-block; margin-right:6px;}
+  .icobtn {display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 32px; padding: 0; margin: 0; background: var(--panel2); border: 2px solid var(--lineS); border-radius: 8px; color: var(--lineS); cursor: pointer; box-shadow: 2px 2px 0 var(--line); font-size: 9px; font-family: 'Press Start 2P', monospace; }  
+  .field{margin-bottom:12px;}
+  .field label{font-size:11px; color:var(--dim); display:block; margin-bottom:5px;}
+  .days-picker{display:flex; gap:6px; flex-wrap:wrap;}
+  .day-chip{width:32px; height:32px; border-radius:9px; border:2px solid var(--lineS); background:var(--panel2); color:var(--dim); cursor:pointer; font-size:12px; box-shadow:2px 2px 0 var(--line);}
+  .day-chip.on{border-color:var(--brassDim); background:var(--brass); color:#fff; box-shadow:1px 1px 0 var(--line); transform:translate(1px,1px);}
+  .swatch-picker{display:flex; gap:8px; flex-wrap:wrap;}
+  .swatch{width:30px; height:30px; border-radius:999px; cursor:pointer; border:2.5px solid var(--panel); box-shadow:0 0 0 2px var(--lineS); display:flex; align-items:center; justify-content:center; font-size:14px; color:#fff;}
+  .swatch.on{box-shadow:0 0 0 2px var(--brassDim);}
+  .modal-bg{position:fixed; inset:0; background:rgba(43,42,58,0.45); display:flex; align-items:flex-end; justify-content:center; z-index:50;}
+  .modal{background:var(--panel); border-radius:18px 18px 0 0; padding:20px; width:100%; max-width:480px; border:var(--pix) solid var(--lineS); border-bottom:none; padding-bottom:calc(20px + env(safe-area-inset-bottom)); box-shadow:0 -3px 0 var(--line);}
+  .btn-primary{flex:1; padding:11px 0; border-radius:10px; background:var(--brass); border:2px solid var(--brassDim); color:#fff; font-weight:700; cursor:pointer; font-family:inherit; box-shadow:3px 3px 0 rgba(255,158,199,0.35);}
+  .btn-primary:active{transform:translate(3px,3px); box-shadow:0 0 0 rgba(255,158,199,0.35);}
+  .btn-ghost{flex:1; padding:11px 0; border-radius:10px; background:var(--panel2); border:2px solid var(--lineS); color:var(--dim); cursor:pointer; font-family:inherit; box-shadow:3px 3px 0 var(--line);}
+  .btn-ghost:active{transform:translate(3px,3px); box-shadow:0 0 0 var(--line);}
+  .navbtn{background:var(--panel2); border:2px solid var(--lineS); color:var(--text); width:34px; height:34px; border-radius:9px; cursor:pointer; font-size:16px; box-shadow:2px 2px 0 var(--line);}
+  .navbtn:active{transform:translate(2px,2px); box-shadow:0 0 0 var(--line);}
+  table{width:100%; border-collapse:collapse; font-size:12px;}
+  th{padding:10px 8px; font-weight:700; border-bottom:2px solid var(--lineS); color:var(--dim); text-align:left; white-space:nowrap;}
+  td{padding:8px; border-bottom:1px solid var(--line); white-space:nowrap;}
+  .tbl-wrap{overflow-x:auto;}
+  .barrow{display:flex; align-items:center; gap:10px; margin-bottom:10px; font-size:12px;}
+  .barrow .lbl{width:88px; flex-shrink:0; color:var(--dim); overflow:hidden; text-overflow:ellipsis;}
+  .barrow .bar{height:10px; border-radius:5px;}
+  .barwrap{flex:1; background:var(--panel2); border-radius:5px; overflow:hidden; display:flex; height:10px; border:1.5px solid var(--lineS);}
+  .stackbar{display:flex; width:100%; height:22px; border-radius:11px; overflow:hidden; border:2px solid var(--lineS); background:var(--panel2);}
+  .empty{padding:24px; text-align:center; color:var(--faint); font-size:13px;}
+  .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:5px;}
+  .cal-head{font-size:10px; color:var(--dim); text-align:center; padding-bottom:6px; font-family:'JetBrains Mono',monospace; font-weight:700;}
+  .cal-cell{background:var(--panel2); border-radius:9px; padding:5px 4px; min-height:58px; display:flex; flex-direction:column; gap:2px; border:2px solid var(--line); cursor:pointer;}
+  .cal-cell.blank{background:none; border-color:transparent; cursor:default;}
+  .cal-cell.today{border-color:var(--pinkLine); background:var(--palepink);}
+  .cal-cell.selected{border-color:var(--brassDark); background:var(--panel2); box-shadow:2px 2px 0 rgba(224,85,154,0.4);}
+  .cal-cell.selected.today{background:var(--palepink);}
+  .cal-day{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--faint);}
+  .cal-hrs{font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; color:var(--text);}
+  .cal-profit{font-family:'JetBrains Mono',monospace; font-size:9px;}
+  .cal-dots{display:flex; gap:2px; flex-wrap:wrap;}
+  .cal-dot{width:6px; height:6px; border-radius:2px;}
+  input[type=number]::-webkit-inner-spin-button{opacity:.5;}
+  ::-webkit-scrollbar{height:6px; width:6px;}
+  ::-webkit-scrollbar-thumb{background:var(--lineS); border-radius:4px;}
+  @keyframes catBob{ 0%,100%{transform:translateX(-30%) translateY(0);} 50%{transform:translateX(-30%) translateY(-3px);} }
+
+  /* ==== ここから: 自作デバイス(240x240 SPI液晶+タクトスイッチ3個)向け追加スタイル ==== */
+  /* タッチ非対応液晶なので、フォーカス中の要素をはっきり見せる（ボタン操作の目印） */
+  #app button:focus-visible,
+  #app input:focus-visible,
+  #app select:focus-visible{
+    outline: 3px solid var(--brassDark);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 5px rgba(224,85,154,0.25);
+  }
+  /* 画面幅が260px以下＝この液晶そのものの想定。詰めて全部入るようにする */
+  @media (max-width:260px){
+    #app{padding:8px 6px 70px; max-width:none;}
+    header{margin-bottom:6px;}
+    .eyebrow{font-size:9px; letter-spacing:1px;}
+    nav{gap:3px; margin-bottom:8px;}
+    nav button{padding:6px 2px; font-size:9px; border-radius:7px;}
+    .card-punch{padding:10px;}
+    .clock{font-size:18px; margin:4px 0 2px;}
+    .goalline{font-size:8px; margin-bottom:8px;}
+    .bigbtn{padding:10px 2px; font-size:11px; border-radius:9px;}
+    .metrics{gap:5px;}
+    .metric{padding:6px 7px;}
+    .metric .lbl{font-size:8px;}
+    .metric .val{font-size:11px;}
+    .projchip{padding:5px 8px; font-size:10px;}
+    .panel{border-radius:10px;}
+    table{font-size:9px;}
+    th,td{padding:5px 4px;}
+    .modal{padding:12px;}
+  }
+  /* ==== 追加スタイルここまで ==== */
+</style>
+
+
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ---------- constants ----------
+const WEEKDAYS = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
+const LOC_COLORS = ["#93B6D6","#A0CFC9","#FFBE56","#FF6744","#FC8B73","#AD95DA","#60C5B7","#DE83A3","#D4D15D","#CFA370"];
+function locColor(locationId){
+  const idx = locations.findIndex(l=>l.id===locationId);
+  const loc = locations[idx];
+  if(loc && loc.color) return loc.color;
+  return LOC_COLORS[Math.max(0,idx)%LOC_COLORS.length];
+}
+const ICONS = {
+  play:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
+  pause:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>',
+  resume:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>',
+  end:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
+};
+
+// ---------- storage (localStorage, self-hosted so it actually persists) ----------
+function load(key, fallback){ try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }catch(e){ return fallback; } }
+function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.error('save failed', e); } }
+
+let locations = load('tt_locations', []);
+let records = load('tt_records', {});
+// migrate old single-record-per-day format to session-array format
+Object.keys(records).forEach(date=>{
+  if(!Array.isArray(records[date])){
+    const old = records[date];
+    if(!old.id) old.id = uid();
+    records[date] = [old];
+  }
+});
+let tab = 'punch';
+let selectedLocId = null;
+let reportMonth = (()=>{ const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; })();
+let editingLoc = null; // for modal
+let showLocForm = false;
+let editingRecordDate = null; // for segment-edit modal
+let editingSessionId = null;
+let editingSegmentsDraft = null;
+let editingCurrentStartDraft = null; // HH:MM draft for an in-progress session's start time
+let selectedReportDate = null; // date selected on Summary calendar
+let showAddRecord = false;
+let showArchived = false;
+let addDraft = null; // {date, locationId, transportCost, reimbursed, segments:[{start,end}]}
+let showDuplicate = false;
+// ---- 休憩タイマー ----
+let breakTimer = { running:false, endsAt:0, finishedAt:0 };
+let lastAlarmPing = 0;
+let audioCtx = null;
+let duplicateSource = null; // {locationId, locationName, hourlyRevenue, hourlyExpense, transportCost, segmentsTimes}
+let duplicateTargetDate = null;
+
+// ---------- helpers ----------
+function pad(n){ return String(n).padStart(2,'0'); }
+function fmtDate(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function fmtTime(iso){ const d=new Date(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function msToHMS(ms){ const s=Math.max(0,Math.floor(ms/1000)); const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60; return `${pad(h)}:${pad(m)}:${pad(sec)}`; }
+function msToMMSS(ms){ const s=Math.max(0,Math.ceil(ms/1000)); const m=Math.floor(s/60),sec=s%60; return `${pad(m)}:${pad(sec)}`; }
+function yen(n){ return `¥${Math.round(n).toLocaleString('ja-JP')}`; }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function computeWorkMs(rec){
+  if(!rec) return 0;
+  let ms = rec.segments.reduce((s,seg)=> s + (new Date(seg.end)-new Date(seg.start)), 0);
+  if(rec.status==='working' && rec.currentStart) ms += Date.now() - new Date(rec.currentStart);
+  return ms;
+}
+function computeMoney(rec){
+  const ms = computeWorkMs(rec);
+  const hrs = ms/3600000;
+  const revenue = hrs * (rec.hourlyRevenue||0);
+  const varExpense = hrs * (rec.hourlyExpense||0);
+  const expense = varExpense + (rec.transportCost||0);
+  return {ms, hrs, revenue, expense, profit: revenue-expense};
+}
+function persistRecords(){ save('tt_records', records); }
+function persistLocations(){ save('tt_locations', locations); }
+
+// ---------- backup export / import (for migrating between Safari tab and Home Screen app storage) ----------
+function exportData(){
+  const payload = { locations, records, exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `timecard-backup-${fmtDate(new Date())}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 3000);
+}
+function importDataFile(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const payload = JSON.parse(reader.result);
+      if(!confirm('現在のデータを上書きしてバックアップを読み込みますか？')) { event.target.value=''; return; }
+      locations = payload.locations || [];
+      records = payload.records || {};
+      Object.keys(records).forEach(date=>{
+        if(!Array.isArray(records[date])){
+          const old = records[date];
+          if(!old.id) old.id = uid();
+          records[date] = [old];
+        }
+      });
+      persistLocations(); persistRecords();
+      render();
+        alert('バックアップを読み込みました!');
+    }catch(e){
+      alert('ファイルの読み込みに失敗しました。正しいバックアップファイルか確認してください。');
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+// ---------- actions ----------
+function activeSessionToday(){
+  const arr = records[fmtDate(new Date())] || [];
+  return arr.find(s=> s.status==='working' || s.status==='paused');
+}
+function doStart(){
+  const loc = locations.find(l=>l.id===selectedLocId);
+  if(!loc) return;
+  const todayStr = fmtDate(new Date());
+  const arr = records[todayStr] || [];
+  if(arr.some(s=> s.status==='working' || s.status==='paused')) return; // guard: one active session at a time
+  const now = new Date().toISOString();
+  const session = {
+    id: uid(), date: todayStr, locationId: loc.id, locationName: loc.name,
+    hourlyRevenue: loc.hourlyRevenue||0, hourlyExpense: loc.hourlyExpense||0,
+    transportCost: loc.transportCost||0, reimbursed:false,
+    segments: [], currentStart: now, status:'working',
+  };
+  records[todayStr] = [...arr, session];
+  persistRecords(); render();
+}
+function doPause(){
+  const s = activeSessionToday(); if(!s || s.status!=='working') return;
+  const now = new Date().toISOString();
+  s.segments.push({start:s.currentStart, end:now});
+  s.currentStart = null; s.status='paused';
+  persistRecords(); render();
+}
+function doResume(){
+  const s = activeSessionToday(); if(!s || s.status!=='paused') return;
+  s.currentStart = new Date().toISOString(); s.status='working';
+  persistRecords(); render();
+}
+function doEnd(dateKey, sessionId){
+  let s;
+  if(dateKey && sessionId){
+    s = (records[dateKey]||[]).find(x=>x.id===sessionId);
+  } else {
+    dateKey = fmtDate(new Date());
+    s = activeSessionToday();
+  }
+  if(!s || s.status==='done') return;
+  if(s.status==='working' && s.currentStart){
+    s.segments.push({start:s.currentStart, end:new Date().toISOString()});
+  }
+  s.currentStart = null; s.status='done';
+  persistRecords(); render();
+}
+
+// ---------- 休憩タイマー ----------
+function unlockAudio(){
+  if(!audioCtx){
+    try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; }
+  }
+  if(audioCtx.state==='suspended'){ audioCtx.resume(); }
+}
+// キー入力(=物理ボタン操作)のたびにAudioContextを起こしておく。
+// ブラウザの自動再生制限で「ユーザー操作なしに音を鳴らす」ことができないため。
+document.addEventListener('keydown', unlockAudio);
+
+function beep(freq, durMs, delaySec){
+  if(!audioCtx) return;
+  const t0 = audioCtx.currentTime + (delaySec||0);
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(0.35, t0+0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0+durMs/1000);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(t0);
+  osc.stop(t0+durMs/1000+0.03);
+}
+function playAlarmPattern(){
+  unlockAudio();
+  if(!audioCtx) return;
+  beep(880, 220, 0);
+  beep(880, 220, 0.3);
+  beep(1046, 320, 0.6);
+}
+function startBreak(minutes){
+  unlockAudio();
+  breakTimer = { running:true, endsAt: Date.now()+minutes*60000, finishedAt:0 };
+  render();
+}
+function cancelBreak(){
+  breakTimer = { running:false, endsAt:0, finishedAt:0 };
+  render();
+}
+function dismissBreakAlarm(){
+  breakTimer = { running:false, endsAt:0, finishedAt:0 };
+  render();
+}
+function breakTick(){
+  const now = Date.now();
+  if(breakTimer.running && now >= breakTimer.endsAt){
+    breakTimer.running = false;
+    breakTimer.finishedAt = now;
+    lastAlarmPing = 0;
+    render();
+  }
+  if(breakTimer.finishedAt){
+    if(now - lastAlarmPing > 4000){ playAlarmPattern(); lastAlarmPing = now; }
+  }
+  if(tab==='punch' && breakTimer.running){
+    const el = document.getElementById('breakClockDisplay');
+    if(el) el.textContent = msToMMSS(breakTimer.endsAt - now);
+  }
+}
+function renderBreakWidget(){
+  if(breakTimer.running){
+    return `<div class="panel" style="padding:14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <div style="font-size:12px;color:var(--dim);flex-shrink:0;">☕ 休憩中</div>
+      <div class="mono" id="breakClockDisplay" style="font-size:17px;font-weight:700;flex:1;text-align:center;">${msToMMSS(breakTimer.endsAt - Date.now())}</div>
+      <button class="icobtn" onclick="cancelBreak()" title="やめる">✕</button>
+    </div>`;
+  }
+  if(breakTimer.finishedAt){
+    return `<div class="panel" style="padding:14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;background:var(--palepink);">
+      <div style="font-size:12px;color:var(--rust);">🔔 休憩、おわり!</div>
+      <button class="bigbtn primary" style="flex:none;padding:8px 14px;" onclick="dismissBreakAlarm()">OK</button>
+    </div>`;
+  }
+  return `<div class="panel" style="padding:12px 14px;margin-bottom:16px;">
+    <div style="font-size:11px;color:var(--dim);margin-bottom:8px;">☕ 休憩タイマー</div>
+    <div class="projlist" style="margin:0;">
+      ${[5,10,15,20,30].map(m=>`<div class="projchip" onclick="startBreak(${m})">${m}分</div>`).join('')}
+    </div>
+  </div>`;
+}
+
+// ---------- render ----------
+function render(){
+  const app = document.getElementById('app');
+  const today = new Date();
+  const todayStr = fmtDate(today);
+  const weekday = today.getDay();
+  const suggested = locations.filter(l => !l.archived && (l.days||[]).includes(weekday));
+  if(!activeSessionToday() && !selectedLocId && locations.length){
+    selectedLocId = (suggested[0]||locations[0]).id;
+  }
+  const unfinished = [];
+  Object.entries(records).forEach(([date, arr])=>{
+    if(date===todayStr) return;
+    arr.forEach(s=>{ if(s.status!=='done') unfinished.push(s); });
+  });
+
+  let html = `
+    <header>
+      <div class="eyebrow">TIME CARD</div>
+      <div style="display:flex;gap:6px;">
+        <button class="icobtn" title="バックアップを書き出すSAVE" onclick="exportData()">SV</button>
+        <label class="icobtn" style="cursor:pointer; color:" title="バックアップを読み込むLOAD">LD<input type="file" accept="application/json" style="display:none;" onchange="importDataFile(event)"></label>
+      </div>
+    </header>`;
+
+  if(unfinished.length){
+    html += `<div class="banner">
+      <div style="display:flex;align-items:flex-start;gap:8px;">
+        <span style="color:var(--rust);flex-shrink:0;">⚠</span>
+        <div style="font-size:13px;">
+          <div style="color:var(--rust);margin-bottom:6px;">終業されていない記録があります</div>
+          ${unfinished.map(r=>`
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;color:var(--dim);">
+              <span class="mono">${r.date}</span><span>${escapeHtml(r.locationName)}</span>
+              <button onclick="doEnd('${r.date}','${r.id}')" style="margin-left:auto;font-size:12px;color:var(--brass);background:none;border:1px solid var(--brassDim);border-radius:6px;padding:2px 8px;cursor:pointer;">今すぐ終業にする</button>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  html += `<nav>
+    <button class="${tab==='punch'?'active':''}" onclick="setTab('punch')">TimeCard</button>
+    <button class="${tab==='locations'?'active':''}" onclick="setTab('locations')">Projects</button>
+    <button class="${tab==='report'?'active':''}" onclick="setTab('report')">Summary</button>
+  </nav>`;
+
+  html += `<div id="tabcontent"></div>`;
+  app.innerHTML = html;
+
+  const content = document.getElementById('tabcontent');
+  if(tab==='punch') content.innerHTML = renderPunch(today, todayStr, weekday, suggested);
+  else if(tab==='locations') content.innerHTML = renderLocations();
+  else content.innerHTML = renderReport();
+
+  if(showLocForm) renderLocModal();
+  if(editingRecordDate) renderRecordEditModal();
+  if(showAddRecord) renderAddRecordModal();
+  if(showDuplicate) renderDuplicateModal();
+}
+
+    function catSprite(cell) {
+        // はみ出しを防止するため、ドットの基本サイズを少し小さくする（元の85%）
+        cell = (cell || 1.8) * 1.5;
+
+        // ① 水色の猫（左向き）の配列
+        const gridBlue = [
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 0, 0, 1, 18, 1, 0, 0, 0, 1, 18, 1, 0, 0],
+            [0, 0, 0, 0, 1, 18, 18, 18, 1, 1, 1, 18, 18, 1, 0, 0],
+            [0, 0, 0, 0, 1, 18, 18, 18, 18, 18, 18, 18, 18, 1, 0, 0],
+            [0, 0, 0, 1, 18, 18, 18, 18, 18, 4, 18, 18, 18, 18, 1, 0],
+            [0, 0, 0, 1, 18, 18, 18, 1, 18, 4, 18, 1, 18, 18, 1, 0],
+            [0, 0, 1, 1, 18, 18, 18, 1, 18, 4, 18, 1, 18, 18, 1, 0],
+            [0, 1, 18, 1, 18, 18, 18, 18, 4, 4, 4, 18, 18, 18, 1, 0],
+            [0, 1, 18, 1, 1, 18, 4, 4, 4, 4, 4, 4, 18, 1, 0, 0],
+            [0, 0, 1, 18, 18, 1, 18, 4, 1, 1, 1, 1, 1, 0, 0, 0],
+            [0, 0, 1, 18, 18, 18, 18, 18, 1, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 1, 4, 1, 4, 1, 4, 1, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        ];
+
+        // ② 茶色のトラ猫（左向き）の配列
+        const gridBrown = [
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 0, 0, 1, 24, 1, 0, 0, 0, 1, 24, 1, 0, 0],
+            [0, 0, 0, 0, 1, 22, 22, 22, 1, 1, 1, 22, 22, 1, 0, 0],
+            [0, 0, 0, 0, 1, 22, 22, 22, 22, 24, 22, 22, 22, 1, 0, 0],
+            [0, 0, 0, 1, 22, 22, 22, 22, 24, 24, 24, 22, 22, 22, 1, 0],
+            [0, 0, 0, 1, 24, 24, 22, 1, 22, 24, 22, 1, 24, 24, 1, 0],
+            [0, 0, 1, 1, 22, 22, 22, 1, 22, 21, 22, 1, 22, 22, 1, 0],
+            [0, 1, 22, 1, 24, 24, 22, 22, 21, 21, 21, 22, 24, 24, 1, 0],
+            [0, 1, 22, 1, 1, 22, 22, 21, 21, 21, 21, 22, 22, 1, 0, 0],
+            [0, 0, 1, 22, 22, 1, 22, 22, 1, 1, 1, 1, 1, 0, 0, 0],
+            [0, 0, 1, 22, 22, 22, 22, 22, 1, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 1, 24, 1, 24, 1, 24, 1, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        ];
+
+        // 配列からHTML文字列を生成する共通処理
+        function getCellsHtml(grid) {
+            return grid.map(row => row.map(v => {
+                let bg = 'transparent';
+                if (v === 1) bg = 'var(--ink)';         // 1: 黒（輪郭）
+                else if (v === 4) bg = '#FFFFFF';       // 4: 白（水色猫の顔・足）
+                else if (v === 18) bg = '#a3c8fb';      // 18: 水色（水色猫の体）
+                else if (v === 21) bg = '#fce0c5';      // 21: ベージュ（茶色猫の顔）
+                else if (v === 22) bg = '#d8945f';      // 22: 茶色（茶色猫の体）
+                else if (v === 24) bg = '#875536';      // 24: 焦げ茶（茶色猫の模様・足）
+                return `<div style="width:${cell}px;height:${cell}px;background:${bg};"></div>`;
+            }).join('')).join('');
+        }
+
+        const blueHtml = `<div style="display:grid;grid-template-columns:repeat(16,${cell}px);grid-template-rows:repeat(16,${cell}px);filter:drop-shadow(1px 1px 0 var(--lineS));">${getCellsHtml(gridBlue)}</div>`;
+        const brownHtml = `<div style="display:grid;grid-template-columns:repeat(16,${cell}px);grid-template-rows:repeat(16,${cell}px);filter:drop-shadow(1px 1px 0 var(--lineS));">${getCellsHtml(gridBrown)}</div>`;
+
+        // ③ 正確に親枠のサイズを固定し、絶対配置(absolute)で重ね合わせる
+        // 1匹16マス - 重なり4マス + 2マス = 青い猫は 14マス分(14 * cell) 右にずらす。
+        // 親枠の横幅は 28マス分(28 * cell)。
+        const totalWidth = 28 * cell;
+        const totalHeight = 16 * cell;
+        const blueOffset = 14 * cell;
+
+        return `
+        <div style="position:relative; width:${totalWidth}px; height:${totalHeight}px;">
+            <div style="position:absolute; left:0; top:0; z-index:2;">${brownHtml}</div>
+            <div style="position:absolute; left:${blueOffset}px; top:0; z-index:1;">${blueHtml}</div>
+        </div>`;
+    }
+    function projectGoalHours(loc) {
+  if(!loc || !loc.startTime || !loc.endTime) return 8;
+  const [sh,sm] = loc.startTime.split(':').map(Number);
+  const [eh,em] = loc.endTime.split(':').map(Number);
+  let mins = (eh*60+em) - (sh*60+sm);
+  if(mins <= 0) mins += 24*60;
+  return mins/60;
+}
+function hmLabel(ms){
+  const totalMin = Math.round(ms/60000);
+  const h = Math.floor(totalMin/60), m = totalMin%60;
+  return h>0 ? `${h}時間${m}分` : `${m}分`;
+}
+function goalLineText(ms, goalHours, locName, escape){
+  const goalMs = goalHours*3600000;
+  const remainMs = Math.max(0, goalMs - ms);
+  const end = new Date(Date.now() + remainMs);
+  const name = escape ? escapeHtml(locName||'') : (locName||'');
+  return `${hmLabel(ms)} / ${pad(end.getHours())}：${pad(end.getMinutes())}に終了予定（${name}）`;
+}
+function renderPunch(today, todayStr, weekday, suggested){
+  const todaySessions = records[todayStr] || [];
+  const activeSession = todaySessions.find(s=> s.status==='working' || s.status==='paused');
+  const otherSessions = todaySessions.filter(s=> s !== activeSession);
+  const status = activeSession ? activeSession.status : 'none';
+  const locked = !!activeSession;
+  const money = activeSession ? computeMoney(activeSession) : {ms:0,hrs:0};
+  const selectableLocations = locations.filter(l=>!l.archived);
+
+  if(selectableLocations.length===0){
+    return `<div class="panel empty">📍<br>有効なProjectがありません。<br>「Projects」タブから追加、またはアーカイブを解除してください。</div>`;
+  }
+
+  if(!locked && (!selectedLocId || !selectableLocations.some(l=>l.id===selectedLocId))){
+    selectedLocId = (suggested[0]||selectableLocations[0]).id;
+  }
+  const currentLocId = locked ? activeSession.locationId : selectedLocId;
+  const currentLoc = locations.find(l=>l.id===currentLocId);
+  const goalHours = projectGoalHours(currentLoc);
+  const percent = goalHours>0 ? Math.min(100, (money.hrs/goalHours)*100) : 0;
+
+  const statusMap = {working:['var(--brass)','作業中'], paused:['var(--blue)','中断中'], none:['var(--faint)','未開始']};
+  const [sColor,sLabel] = statusMap[status];
+
+  const chipLocations = locked && currentLoc && currentLoc.archived ? [currentLoc, ...selectableLocations] : selectableLocations;
+  const chipsHtml = chipLocations.map(l=>{
+    const isCurrent = l.id===currentLocId;
+    let cls = 'projchip';
+    let style = '';
+    if(locked){
+      cls += isCurrent ? ' running' : ' grayout';
+      if(isCurrent) style = `background:${locColor(l.id)};border-color:${locColor(l.id)};`;
+    } else if(isCurrent){
+      cls += ' selected';
+    }
+    const onclick = locked ? '' : `onclick="selectedLocId='${l.id}'; render();"`;
+    return `<div class="${cls}" style="${style}" ${onclick}>
+      <span class="sq" style="background:${isCurrent&&locked?'rgba(255,255,255,0.85)':locColor(l.id)};"></span>${escapeHtml(l.name)}
+    </div>`;
+  }).join('');
+
+  let buttonsHtml;
+  if(status==='none'){
+    buttonsHtml = `<div class="btnrow"><button class="bigbtn primary" onclick="doStart()">はじめる</button></div>`;
+  } else {
+    const toggleLabel = status==='working' ? '少し休む' : 'また働く';
+    const toggleClass = status==='working' ? 'pale' : 'primary';
+    const toggleOnclick = status==='working' ? 'doPause()' : 'doResume()';
+    buttonsHtml = `<div class="btnrow">
+      <button class="bigbtn ${toggleClass}" style="flex:2;" onclick="${toggleOnclick}">${toggleLabel}</button>
+      <button class="bigbtn secondary" style="flex:1;" onclick="doEnd()">おつかれ</button>
+    </div>`;
+  }
+
+  let html = `<div class="panel card-punch">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div class="mono" style="font-size:12px;color:var(--faint);">${today.getFullYear()}.${pad(today.getMonth()+1)}.${pad(today.getDate())} (${WEEKDAYS[weekday]})</div>
+      <div class="status-dot"><span class="dot" style="background:${sColor};"></span><span class="mono" style="color:${sColor};font-size:13px;">${sLabel}</span></div>
+    </div>
+    <div id="clockDisplay" class="clock" style="color:${status==='none'?'var(--faint)':sColor};">${msToHMS(money.ms)}</div>
+    <div class="projlist">${chipsHtml}</div>
+    <div class="progresswrap">
+      <div class="catwalk ${status==='working'?'walking':''}" style="left:${percent}%;">${catSprite(1.8)}</div>
+      <div class="progresstrack"><div class="progressfill" style="width:${percent}%;"></div></div>
+    </div>
+    <div class="goalline">${goalLineText(money.ms, goalHours, currentLoc?currentLoc.name:'', true)}</div>
+    ${buttonsHtml}
+  </div>`;
+
+  if(activeSession){
+    html += renderSessionCard(activeSession, todayStr);
+  }
+  otherSessions.slice().reverse().forEach(s=>{ html += renderSessionCard(s, todayStr); });
+
+  html += renderBreakWidget();
+
+  html += renderTodayStackedBar(todaySessions);
+
+  return html;
+}
+
+function renderSessionCard(s, todayStr){
+  const canEditTimes = s.segments.length>0 || s.status==='working';
+  return `<div class="panel" style="padding:18px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${s.segments.length?'10px':'0'};">
+        <div style="font-size:12px;color:var(--dim);display:flex;align-items:center;gap:6px;">
+          <span class="dot-sm" style="background:${locColor(s.locationId)};"></span>${escapeHtml(s.locationName)}${s.status!=='done'?'（進行中）':''}
+        </div>
+        ${canEditTimes? `<div style="display:flex;gap:6px;">
+          <button onclick="openRecordEdit('${todayStr}','${s.id}')" style="background:none;border:1px solid var(--line);color:var(--dim);border-radius:7px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:inherit;">✎ 時間を編集</button>
+          ${s.segments.length? `<button onclick="openDuplicate('${todayStr}','${s.id}')" style="background:none;border:1px solid var(--line);color:var(--dim);border-radius:7px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:inherit;">⧉ 複製</button>` : ''}
+        </div>` : ''}
+      </div>
+      ${s.status==='working' && s.currentStart? `<div class="seg mono"><span>${fmtTime(s.currentStart)} – 進行中</span></div>` : ''}
+      ${s.segments.length? `<div>
+        ${s.segments.map(seg=>`<div class="seg mono"><span>${fmtTime(seg.start)} – ${fmtTime(seg.end)}</span><span style="color:var(--faint);">(${msToHMS(new Date(seg.end)-new Date(seg.start))})</span></div>`).join('')}
+      </div>` : ''}
+    </div>`;
+}
+
+function renderTodayStackedBar(todaySessions){
+  const totals = {};
+  todaySessions.forEach(s=>{
+    const ms = computeWorkMs(s);
+    if(!totals[s.locationId]) totals[s.locationId] = {name:s.locationName, id:s.locationId, ms:0};
+    totals[s.locationId].ms += ms;
+  });
+  const arr = Object.values(totals);
+  const totalMs = arr.reduce((a,b)=>a+b.ms,0);
+  if(totalMs<=0) return '';
+  const segmentsHtml = arr.map(v=>`<div style="width:${(v.ms/totalMs*100)}%;background:${locColor(v.id)};" title="${escapeHtml(v.name)}"></div>`).join('');
+  const legend = arr.map(v=>`<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--dim);"><span class="dot-sm" style="background:${locColor(v.id)};"></span>${escapeHtml(v.name)}<span class="mono">${Math.round(v.ms/totalMs*100)}%</span></div>`).join('');
+  return `<div class="panel" style="padding:16px;margin-bottom:16px;">
+    <div style="font-size:12px;color:var(--dim);margin-bottom:10px;">きょうの内訳</div>
+    <div class="stackbar">${segmentsHtml}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;">${legend}</div>
+  </div>`;
+}
+
+function renderLocations(){
+  const active = locations.filter(l=>!l.archived);
+  const archived = locations.filter(l=>l.archived);
+
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+    <div style="font-size:13px;color:var(--dim);">曜日ごとのProjectと単価を登録します</div>
+    <button onclick="openLocForm(null)" style="background:var(--brass);color:#fff;border:2px solid var(--brassDim);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:2px 2px 0 rgba(255,158,199,0.3);">＋ 追加</button>
+  </div>`;
+
+  if(active.length===0){
+    html += `<div class="panel empty">有効なProjectがありません</div>`;
+  }
+  html += active.map((l,i)=>`
+    <div class="panel locrow">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div class="loc-name"><span class="dot-sm" style="background:${locColor(l.id)};"></span>${escapeHtml(l.name)}</div>
+          <div class="mono" style="font-size:12px;color:var(--faint);">${(l.days||[]).map(d=>WEEKDAYS[d]).join('・')||'曜日未設定'} ・ ${l.startTime}–${l.endTime}</div>
+          <div class="mono" style="font-size:12px;color:var(--dim);margin-top:4px;">時給収入 ${yen(l.hourlyRevenue)} ／ 時間経費 ${yen(l.hourlyExpense||0)} ／ 交通費 ${yen(l.transportCost)}</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="icobtn" onclick="openLocForm('${l.id}')">✎</button>
+          <button class="icobtn" title="アーカイブする" onclick="archiveLoc('${l.id}', true)">🗄</button>
+          <button class="icobtn" style="color:var(--rust);" onclick="removeLoc('${l.id}')">🗑</button>
+        </div>
+      </div>
+    </div>`).join('');
+
+  html += `<button onclick="showArchived=!showArchived; render();" style="width:100%;background:none;border:2px dashed var(--lineS);color:var(--dim);border-radius:10px;padding:10px;cursor:pointer;font-family:inherit;font-size:12px;margin-top:8px;">${showArchived?'▲':'▼'} アーカイブ済み（${archived.length}）</button>`;
+
+  if(showArchived){
+    if(archived.length===0){
+      html += `<div class="panel empty" style="margin-top:10px;">アーカイブ済みのProjectはありません</div>`;
+    }
+    html += archived.map((l)=>`
+      <div class="panel locrow" style="opacity:0.6;margin-top:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div class="loc-name"><span class="dot-sm" style="background:${locColor(l.id)};"></span>${escapeHtml(l.name)}</div>
+            <div class="mono" style="font-size:12px;color:var(--faint);">${(l.days||[]).map(d=>WEEKDAYS[d]).join('・')||'曜日未設定'} ・ ${l.startTime}–${l.endTime}</div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="icobtn" title="復元する" onclick="archiveLoc('${l.id}', false)">↩</button>
+            <button class="icobtn" style="color:var(--rust);" onclick="removeLoc('${l.id}')">🗑</button>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+  return html;
+}
+function archiveLoc(id, value){
+  locations = locations.map(l=> l.id===id ? {...l, archived:value} : l);
+  persistLocations();
+  render();
+}
+
+function openLocForm(id){
+  editingLoc = id ? {...locations.find(l=>l.id===id)} : {id:uid(), name:'', days:[], startTime:'09:00', endTime:'18:00', transportCost:0, hourlyRevenue:0, hourlyExpense:0, color: LOC_COLORS[locations.length % LOC_COLORS.length], archived:false};
+  showLocForm = true;
+  render();
+}
+function closeLocForm(){ showLocForm=false; editingLoc=null; render(); }
+
+// ---------- segment (打刻時間) editing ----------
+function localToISO(dateStr, hhmm){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const [hh,mm] = (hhmm||'00:00').split(':').map(Number);
+  return new Date(y, m-1, d, hh, mm, 0).toISOString();
+}
+function openRecordEdit(date, sessionId){
+  const s = (records[date]||[]).find(x=>x.id===sessionId);
+  if(!s) return;
+  editingRecordDate = date;
+  editingSessionId = sessionId;
+  editingSegmentsDraft = s.segments.map(seg=>({start:fmtTime(seg.start), end:fmtTime(seg.end)}));
+  editingCurrentStartDraft = (s.status==='working' && s.currentStart) ? fmtTime(s.currentStart) : null;
+  render();
+}
+function closeRecordEdit(){ editingRecordDate=null; editingSessionId=null; editingSegmentsDraft=null; editingCurrentStartDraft=null; render(); }
+function updateSegDraft(idx, field, value){ editingSegmentsDraft[idx][field]=value; }
+function addSegDraft(){ editingSegmentsDraft.push({start:'09:00', end:'10:00'}); render(); }
+function removeSegDraft(idx){ editingSegmentsDraft.splice(idx,1); render(); }
+function updateCurrentStartDraft(value){ editingCurrentStartDraft = value; }
+function saveRecordEdit(){
+  const date = editingRecordDate;
+  const s = (records[date]||[]).find(x=>x.id===editingSessionId);
+  const segments = [];
+  for(const draft of editingSegmentsDraft){
+    const start = localToISO(date, draft.start);
+    const end = localToISO(date, draft.end);
+    if(new Date(end) <= new Date(start)){
+      alert(`終了時刻は開始時刻より後にしてください（${draft.start}〜${draft.end}）`);
+      return;
+    }
+    segments.push({start, end});
+  }
+  if(editingCurrentStartDraft!==null && s.status==='working'){
+    const newStart = localToISO(date, editingCurrentStartDraft);
+    if(new Date(newStart) > new Date()){
+      alert('開始時刻は現在時刻より後にはできません');
+      return;
+    }
+    s.currentStart = newStart;
+  }
+  s.segments = segments;
+  persistRecords();
+  editingRecordDate = null; editingSessionId = null; editingSegmentsDraft = null; editingCurrentStartDraft = null;
+  render();
+}
+function renderRecordEditModal(){
+  const date = editingRecordDate;
+  const s = (records[date]||[]).find(x=>x.id===editingSessionId);
+  if(!s){ closeRecordEdit(); return; }
+  const modalHtml = `
+    <div class="modal-bg" onclick="if(event.target===this) closeRecordEdit()">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px;">打刻時間を編集</div>
+        <div class="mono" style="font-size:12px;color:var(--faint);margin-bottom:14px;">${date}　${escapeHtml(s.locationName)}</div>
+        ${editingCurrentStartDraft!==null? `
+        <div class="field">
+          <label>進行中の開始時刻</label>
+          <input type="time" value="${editingCurrentStartDraft}" oninput="updateCurrentStartDraft(this.value)">
+        </div>` : ''}
+        ${editingSegmentsDraft.map((seg,idx)=>`
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <input type="time" value="${seg.start}" style="flex:1;" oninput="updateSegDraft(${idx},'start',this.value)">
+            <span style="color:var(--faint);">–</span>
+            <input type="time" value="${seg.end}" style="flex:1;" oninput="updateSegDraft(${idx},'end',this.value)">
+            <button class="icobtn" style="color:var(--rust);" onclick="removeSegDraft(${idx})">🗑</button>
+          </div>`).join('')}
+        ${editingSegmentsDraft.length===0? `<div style="font-size:12px;color:var(--faint);margin-bottom:10px;">区間がありません</div>` : ''}
+        <button onclick="addSegDraft()" style="background:none;border:1px dashed var(--lineS);color:var(--dim);border-radius:8px;padding:8px;width:100%;cursor:pointer;font-family:inherit;font-size:13px;margin-bottom:16px;">＋ 区間を追加</button>
+        <div style="display:flex;gap:10px;">
+          <button class="btn-ghost" onclick="closeRecordEdit()">キャンセル</button>
+          <button class="btn-primary" onclick="saveRecordEdit()">保存</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('app').insertAdjacentHTML('beforeend', modalHtml);
+}
+
+// ---------- add record for arbitrary date (後日打刻) ----------
+function openAddRecord(){
+  if(locations.length===0){ alert('先にProjectsタブからProjectを登録してください'); return; }
+  const loc = locations.find(l=>!l.archived) || locations[0];
+  addDraft = {
+    date: fmtDate(new Date()), locationId: loc.id,
+    transportCost: loc.transportCost||0, reimbursed:false,
+    segments: [{start:'09:00', end:'18:00'}],
+  };
+  showAddRecord = true;
+  render();
+}
+function closeAddRecord(){ showAddRecord=false; addDraft=null; render(); }
+function updateAddDraft(key, value, isNum){ addDraft[key] = isNum ? Number(value) : value; }
+function onAddDraftLocationChange(locId){
+  const loc = locations.find(l=>l.id===locId);
+  addDraft.locationId = locId;
+  if(loc) addDraft.transportCost = loc.transportCost||0;
+  render();
+}
+function addDraftSegAdd(){ addDraft.segments.push({start:'09:00', end:'18:00'}); render(); }
+function addDraftSegRemove(idx){ addDraft.segments.splice(idx,1); render(); }
+function addDraftSegUpdate(idx, field, value){ addDraft.segments[idx][field] = value; }
+function saveAddRecord(){
+  const loc = locations.find(l=>l.id===addDraft.locationId);
+  if(!loc){ alert('勤務先を選択してください'); return; }
+  if(!addDraft.date){ alert('日付を入力してください'); return; }
+  const segments = [];
+  for(const seg of addDraft.segments){
+    const start = localToISO(addDraft.date, seg.start);
+    const end = localToISO(addDraft.date, seg.end);
+    if(new Date(end) <= new Date(start)){
+      alert(`終了時刻は開始時刻より後にしてください（${seg.start}〜${seg.end}）`);
+      return;
+    }
+    segments.push({start, end});
+  }
+  const session = {
+    id: uid(), date: addDraft.date, locationId: loc.id, locationName: loc.name,
+    hourlyRevenue: loc.hourlyRevenue||0, hourlyExpense: loc.hourlyExpense||0,
+    transportCost: Number(addDraft.transportCost)||0, reimbursed: !!addDraft.reimbursed,
+    segments, currentStart:null, status:'done',
+  };
+  records[addDraft.date] = [...(records[addDraft.date]||[]), session];
+  persistRecords();
+  reportMonth = addDraft.date.slice(0,7);
+  showAddRecord = false; addDraft = null;
+  render();
+}
+function renderAddRecordModal(){
+  const d = addDraft;
+  const modalHtml = `
+    <div class="modal-bg" onclick="if(event.target===this) closeAddRecord()">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div style="font-weight:700;font-size:15px;margin-bottom:14px;">日付を指定して記録を追加</div>
+        <div class="field"><label>日付</label><input type="date" value="${d.date}" oninput="updateAddDraft('date', this.value)"></div>
+        <div class="field"><label>勤務先</label>
+          <select onchange="onAddDraftLocationChange(this.value)">
+            ${locations.map(l=>`<option value="${l.id}" ${l.id===d.locationId?'selected':''}>${escapeHtml(l.name)}${l.archived?'（アーカイブ）':''}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label>区間</label>
+          ${d.segments.map((seg,idx)=>`
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+              <input type="time" value="${seg.start}" style="flex:1;" oninput="addDraftSegUpdate(${idx},'start',this.value)">
+              <span style="color:var(--faint);">–</span>
+              <input type="time" value="${seg.end}" style="flex:1;" oninput="addDraftSegUpdate(${idx},'end',this.value)">
+              <button class="icobtn" style="color:var(--rust);" onclick="addDraftSegRemove(${idx})">🗑</button>
+            </div>`).join('')}
+          <button onclick="addDraftSegAdd()" style="background:none;border:1px dashed var(--lineS);color:var(--dim);border-radius:8px;padding:8px;width:100%;cursor:pointer;font-family:inherit;font-size:13px;">＋ 区間を追加</button>
+        </div>
+        <div class="field"><label>交通費（円）</label><input type="number" value="${d.transportCost}" oninput="updateAddDraft('transportCost', this.value, true)"></div>
+        <div class="field" style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="addReimb" ${d.reimbursed?'checked':''} onchange="updateAddDraft('reimbursed', this.checked)" style="width:auto;">
+          <label for="addReimb" style="margin:0;">精算済みにする</label>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:8px;">
+          <button class="btn-ghost" onclick="closeAddRecord()">キャンセル</button>
+          <button class="btn-primary" onclick="saveAddRecord()">追加する</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('app').insertAdjacentHTML('beforeend', modalHtml);
+}
+
+// ---------- duplicate a record onto another date (打刻内容の複製) ----------
+function openDuplicate(date, sessionId){
+  const s = (records[date]||[]).find(x=>x.id===sessionId);
+  if(!s) return;
+  duplicateSource = {
+    locationId: s.locationId, locationName: s.locationName,
+    hourlyRevenue: s.hourlyRevenue, hourlyExpense: s.hourlyExpense, transportCost: s.transportCost,
+    segmentsTimes: s.segments.map(seg=>({start:fmtTime(seg.start), end:fmtTime(seg.end)})),
+  };
+  const orig = new Date(date); orig.setDate(orig.getDate()+1);
+  duplicateTargetDate = fmtDate(orig);
+  showDuplicate = true;
+  render();
+}
+function closeDuplicate(){ showDuplicate=false; duplicateSource=null; duplicateTargetDate=null; render(); }
+function updateDuplicateDate(value){ duplicateTargetDate = value; }
+function confirmDuplicate(){
+  const src = duplicateSource;
+  const targetDate = duplicateTargetDate;
+  if(!targetDate){ alert('日付を選択してください'); return; }
+  const segments = src.segmentsTimes.map(t=>({start: localToISO(targetDate, t.start), end: localToISO(targetDate, t.end)}));
+  const session = {
+    id: uid(), date: targetDate, locationId: src.locationId, locationName: src.locationName,
+    hourlyRevenue: src.hourlyRevenue, hourlyExpense: src.hourlyExpense, transportCost: src.transportCost,
+    reimbursed:false, segments, currentStart:null, status:'done',
+  };
+  records[targetDate] = [...(records[targetDate]||[]), session];
+  persistRecords();
+  reportMonth = targetDate.slice(0,7);
+  showDuplicate = false; duplicateSource = null; duplicateTargetDate = null;
+  render();
+}
+function renderDuplicateModal(){
+  const src = duplicateSource;
+  const modalHtml = `
+    <div class="modal-bg" onclick="if(event.target===this) closeDuplicate()">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px;">記録を複製</div>
+        <div class="mono" style="font-size:12px;color:var(--faint);margin-bottom:14px;">${escapeHtml(src.locationName)}　${src.segmentsTimes.map(t=>`${t.start}–${t.end}`).join('、')}</div>
+        <div class="field"><label>複製先の日付</label><input type="date" value="${duplicateTargetDate}" oninput="updateDuplicateDate(this.value)"></div>
+        <div style="font-size:12px;color:var(--faint);margin-bottom:8px;">同じ勤務先・時間帯・交通費でその日にコピーします（精算チェックは未済でコピーされます）</div>
+        <div style="display:flex;gap:10px;margin-top:8px;">
+          <button class="btn-ghost" onclick="closeDuplicate()">キャンセル</button>
+          <button class="btn-primary" onclick="confirmDuplicate()">複製する</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('app').insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function toggleDay(idx){
+  const set = new Set(editingLoc.days||[]);
+  set.has(idx) ? set.delete(idx) : set.add(idx);
+  editingLoc.days = [...set].sort();
+  render();
+}
+function updateEditingField(key, value, isNum){
+  editingLoc[key] = isNum ? Number(value) : value;
+}
+function saveLoc(){
+  if(!editingLoc.name.trim()){ alert('名称を入力してください'); return; }
+  const exists = locations.some(l=>l.id===editingLoc.id);
+  locations = exists ? locations.map(l=> l.id===editingLoc.id ? editingLoc : l) : [...locations, editingLoc];
+  persistLocations();
+  showLocForm=false; editingLoc=null;
+  render();
+}
+function removeLoc(id){
+  if(!confirm('この勤務先を削除しますか？')) return;
+  locations = locations.filter(l=>l.id!==id);
+  persistLocations(); render();
+}
+
+function renderLocModal(){
+  const e = editingLoc;
+  const modalHtml = `
+    <div class="modal-bg" onclick="if(event.target===this) closeLocForm()">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div style="font-weight:700;font-size:15px;margin-bottom:14px;">${locations.some(l=>l.id===e.id)?'勤務先を編集':'勤務先を追加'}</div>
+        <div class="field"><label>名称</label><input id="f_name" value="${escapeHtml(e.name)}" placeholder="例：本社オフィス" oninput="updateEditingField('name', this.value)"></div>
+        <div class="field"><label>曜日</label><div class="days-picker">
+          ${WEEKDAYS.map((w,idx)=>`<button type="button" class="day-chip ${(e.days||[]).includes(idx)?'on':''}" onclick="toggleDay(${idx})">${w}</button>`).join('')}
+        </div></div>
+        <div style="display:flex;gap:10px;">
+          <div class="field" style="flex:1;"><label>開始時刻</label><input type="time" value="${e.startTime}" oninput="updateEditingField('startTime', this.value)"></div>
+          <div class="field" style="flex:1;"><label>終了時刻</label><input type="time" value="${e.endTime}" oninput="updateEditingField('endTime', this.value)"></div>
+        </div>
+        <div class="field"><label>色</label><div class="swatch-picker">
+          ${LOC_COLORS.map(c=>`<div class="swatch ${e.color===c?'on':''}" style="background:${c};" onclick="updateEditingField('color','${c}'); render();">${e.color===c?'✓':''}</div>`).join('')}
+        </div></div>
+        <div class="field"><label>時給（収入単価 円/時）</label><input type="number" value="${e.hourlyRevenue}" oninput="updateEditingField('hourlyRevenue', this.value, true)"></div>
+        <div class="field"><label>時間あたり経費（円/時・任意）</label><input type="number" value="${e.hourlyExpense||0}" oninput="updateEditingField('hourlyExpense', this.value, true)"></div>
+        <div class="field"><label>交通費（1日あたり・円）</label><input type="number" value="${e.transportCost}" oninput="updateEditingField('transportCost', this.value, true)"></div>
+        <div style="display:flex;gap:10px;margin-top:16px;">
+          <button class="btn-ghost" onclick="closeLocForm()">キャンセル</button>
+          <button class="btn-primary" onclick="saveLoc()">保存</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('app').insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function yenCompact(n){
+  const abs = Math.abs(n);
+  if(abs >= 10000) return `${n<0?'-':''}${(abs/1000).toFixed(1)}k`;
+  return yen(n);
+}
+function polarToCartesian(cx, cy, r, angleDeg){
+  const rad = (angleDeg-90) * Math.PI/180;
+  return { x: cx + r*Math.cos(rad), y: cy + r*Math.sin(rad) };
+}
+function describeArc(cx, cy, r, startAngle, endAngle){
+  if(endAngle - startAngle >= 359.999) endAngle = startAngle + 359.999;
+  const s = polarToCartesian(cx, cy, r, startAngle);
+  const e = polarToCartesian(cx, cy, r, endAngle);
+  const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+  return `M ${cx} ${cy} L ${s.x.toFixed(2)} ${s.y.toFixed(2)} A ${r} ${r} 0 ${largeArc} 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)} Z`;
+}
+function buildPieSVG(data, size){
+  size = size || 120;
+  const total = data.reduce((s,d)=> s + Math.max(0,d.value), 0);
+  const r = size/2;
+  if(total <= 0){
+    return `<div style="width:${size}px;height:${size}px;border-radius:999px;background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--faint);margin:0 auto;">データなし</div>`;
+  }
+  let cum = 0;
+  const slices = data.filter(d=>d.value>0).map(d=>{
+    const angle = d.value/total*360;
+    const path = describeArc(r, r, r, cum, cum+angle);
+    cum += angle;
+    return `<path d="${path}" fill="${d.color}"></path>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="display:block;margin:0 auto;">${slices}</svg>`;
+}
+function renderCalendar(rows, reportMonth){
+  const byDate = {};
+  rows.forEach(r=>{
+    if(!byDate[r.date]) byDate[r.date] = {hrs:0, profit:0, locIds:new Set()};
+    const d = byDate[r.date];
+    d.hrs += r.hrs; d.profit += r.profit; d.locIds.add(r.locationId);
+  });
+  const [y,m] = reportMonth.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const startWeekday = new Date(y, m-1, 1).getDay();
+  const todayStr = fmtDate(new Date());
+
+  const cells = [];
+  for(let i=0;i<startWeekday;i++) cells.push(null);
+  for(let d=1; d<=daysInMonth; d++) cells.push(d);
+  while(cells.length % 7 !== 0) cells.push(null);
+
+  const cellHtml = cells.map(d=>{
+    if(d===null) return `<div class="cal-cell blank"></div>`;
+    const dateStr = `${y}-${pad(m)}-${pad(d)}`;
+    const info = byDate[dateStr];
+    const isToday = dateStr === todayStr;
+    const isSelected = dateStr === selectedReportDate;
+    const cellCls = `cal-cell ${isToday?'today':''} ${isSelected?'selected':''}`;
+    if(!info){
+      return `<div class="${cellCls}" onclick="selectReportDate('${dateStr}')"><div class="cal-day">${d}</div></div>`;
+    }
+    const dots = [...info.locIds].map(id=>{
+      const idx = Math.max(0, locations.findIndex(l=>l.id===id));
+      return `<span class="cal-dot" style="background:${locColor(id)};"></span>`;
+    }).join('');
+    return `<div class="${cellCls}" onclick="selectReportDate('${dateStr}')">
+      <div class="cal-day">${d}</div>
+      <div class="cal-hrs">${info.hrs.toFixed(1)}h</div>
+      <div class="cal-profit" style="color:${info.profit>=0?'var(--teal)':'var(--rust)'};">${yenCompact(info.profit)}</div>
+      <div class="cal-dots">${dots}</div>
+    </div>`;
+  }).join('');
+
+  return `<div class="panel" style="padding:16px;margin-bottom:16px;">
+    <div style="font-size:12px;color:var(--faint);margin-bottom:10px;">カレンダー（稼働時間・収支）</div>
+    <div class="cal-grid" style="margin-bottom:6px;">
+      ${WEEKDAYS.map(w=>`<div class="cal-head">${w}</div>`).join('')}
+    </div>
+    <div class="cal-grid">${cellHtml}</div>
+  </div>`;
+}
+
+function renderReport(){
+  const allSessions = [];
+  Object.entries(records).forEach(([date, arr])=> arr.forEach(s=> allSessions.push(s)));
+  const monthSessions = allSessions.filter(s=>s.date.startsWith(reportMonth)).sort((a,b)=> a.date.localeCompare(b.date) || (a.currentStart||a.segments[0]?.start||'').localeCompare(b.currentStart||b.segments[0]?.start||''));
+  const rows = monthSessions.map(r=>({...r, ...computeMoney(r)}));
+  const totals = rows.reduce((acc,r)=>({
+    hrs: acc.hrs+r.hrs, revenue: acc.revenue+r.revenue, expense: acc.expense+r.expense,
+    profit: acc.profit+r.profit, unreimbursed: acc.unreimbursed + (r.reimbursed?0:(r.transportCost||0)),
+  }), {hrs:0,revenue:0,expense:0,profit:0,unreimbursed:0});
+
+  const byLoc = {};
+  rows.forEach(r=>{
+    if(!byLoc[r.locationId]) byLoc[r.locationId] = {id:r.locationId, name:r.locationName, revenue:0, expense:0};
+    byLoc[r.locationId].revenue += r.revenue; byLoc[r.locationId].expense += r.expense;
+  });
+  const byLocArr = Object.values(byLoc);
+
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <button class="navbtn" onclick="changeMonth(-1)">‹</button>
+    <div class="mono" style="font-size:16px;font-weight:700;">${reportMonth}（月末締め）</div>
+    <button class="navbtn" onclick="changeMonth(1)">›</button>
+  </div>
+  <button onclick="openAddRecord()" style="width:100%;background:none;border:1px dashed var(--lineS);color:var(--dim);border-radius:10px;padding:10px;cursor:pointer;font-family:inherit;font-size:13px;margin-bottom:16px;">＋ 日付を指定して記録を追加</button>`;
+
+  html += `<div class="metrics" style="grid-template-columns:repeat(2,1fr);margin-bottom:16px;">
+    <div class="metric"><div class="lbl">合計工数</div><div class="val mono">${totals.hrs.toFixed(1)} h</div></div>
+    <div class="metric"><div class="lbl">合計収入</div><div class="val mono" style="color:var(--teal);">${yen(totals.revenue)}</div></div>
+    <div class="metric"><div class="lbl">合計支出</div><div class="val mono" style="color:var(--rust);">${yen(totals.expense)}</div></div>
+    <div class="metric"><div class="lbl">利益</div><div class="val mono" style="color:${totals.profit>=0?'var(--teal)':'var(--rust)'};">${yen(totals.profit)}</div></div>
+  </div>`;
+
+  if(totals.unreimbursed>0){
+    html += `<div class="panel" style="padding:12px;margin-bottom:16px;border-color:rgba(200,155,60,0.4);">
+      <div style="font-size:12px;color:var(--brass);">未精算の交通費合計：<span class="mono" style="font-weight:700;">${yen(totals.unreimbursed)}</span></div>
+    </div>`;
+  }
+
+  html += renderCalendar(rows, reportMonth);
+
+  if(byLocArr.length){
+    const revenueData = byLocArr.map(v=>({id:v.id, name:v.name, value:v.revenue, color:locColor(v.id)}));
+    const expenseData = byLocArr.map(v=>({id:v.id, name:v.name, value:v.expense, color:locColor(v.id)}));
+    const revTotal = revenueData.reduce((s,d)=>s+Math.max(0,d.value),0);
+    const expTotal = expenseData.reduce((s,d)=>s+Math.max(0,d.value),0);
+    const legendRows = (data, total) => data.filter(d=>d.value>0).map(d=>`
+      <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim);margin-bottom:4px;">
+        <span class="dot-sm" style="background:${d.color};flex-shrink:0;"></span>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(d.name)}</span>
+        <span class="mono" style="flex-shrink:0;">${total>0?Math.round(d.value/total*100):0}%</span>
+      </div>`).join('');
+
+    html += `<div class="panel" style="padding:16px;margin-bottom:16px;">
+      <div style="font-size:12px;color:var(--faint);margin-bottom:14px;">案件別収支</div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:140px;">
+          <div style="font-size:11px;color:var(--dim);text-align:center;margin-bottom:10px;">収入構成</div>
+          ${buildPieSVG(revenueData, 120)}
+          <div style="margin-top:12px;">${legendRows(revenueData, revTotal)}</div>
+        </div>
+        <div style="flex:1;min-width:140px;">
+          <div style="font-size:11px;color:var(--dim);text-align:center;margin-bottom:10px;">支出構成</div>
+          ${buildPieSVG(expenseData, 120)}
+          <div style="margin-top:12px;">${legendRows(expenseData, expTotal)}</div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  const displayRows = selectedReportDate ? rows.filter(r=>r.date===selectedReportDate) : rows;
+
+  html += `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+    <div style="font-size:12px;color:var(--dim);">${selectedReportDate ? escapeHtml(selectedReportDate)+' の記録' : 'すべての記録'}</div>
+    ${selectedReportDate ? `<button onclick="selectReportDate('${selectedReportDate}')" style="background:none;border:1px solid var(--line);color:var(--dim);border-radius:7px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:inherit;">✕ 選択解除</button>` : ''}
+  </div>`;
+
+  html += `<div class="panel" style="padding:4px;"><div class="tbl-wrap"><table>
+    <thead><tr>${['日付','勤務先','工数','収入','交通費','支出','利益','精算','','',''].map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+    <tbody>
+      ${displayRows.length===0? `<tr><td colspan="11" style="text-align:center;color:var(--faint);padding:20px;">${selectedReportDate?'この日の記録はありません':'この月の記録はありません'}</td></tr>` :
+        displayRows.map(r=>`
+        <tr>
+          <td class="mono">${r.date.slice(5)}</td>
+          <td><span class="dot-sm" style="background:${locColor(r.locationId)};"></span>${escapeHtml(r.locationName)}</td>
+          <td class="mono">${r.hrs.toFixed(2)}h</td>
+          <td class="mono" style="color:var(--teal);">${yen(r.revenue)}</td>
+          <td><input type="number" value="${r.transportCost}" class="mono" style="width:64px;padding:3px 5px;font-size:12px;" onchange="updateTransport('${r.date}','${r.id}', this.value)"></td>
+          <td class="mono" style="color:var(--rust);">${yen(r.expense)}</td>
+          <td class="mono" style="color:${r.profit>=0?'var(--teal)':'var(--rust)'};font-weight:700;">${yen(r.profit)}</td>
+          <td><button onclick="toggleReimbursed('${r.date}','${r.id}')" style="background:none;border:none;cursor:pointer;font-size:15px;">${r.reimbursed?'✅':'⭕'}</button></td>
+          <td><button onclick="openRecordEdit('${r.date}','${r.id}')" style="background:none;border:none;color:var(--dim);cursor:pointer;">✎</button></td>
+          <td><button onclick="openDuplicate('${r.date}','${r.id}')" style="background:none;border:none;color:var(--dim);cursor:pointer;">⧉</button></td>
+          <td><button onclick="deleteRecord('${r.date}','${r.id}')" style="background:none;border:none;color:var(--faint);cursor:pointer;">🗑</button></td>
+        </tr>`).join('')}
+    </tbody>
+  </table></div></div>`;
+
+  return html;
+}
+function changeMonth(delta){
+  const [y,m] = reportMonth.split('-').map(Number);
+  const d = new Date(y, m-1+delta, 1);
+  reportMonth = `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+  selectedReportDate = null;
+  render();
+}
+function selectReportDate(dateStr){
+  selectedReportDate = (selectedReportDate===dateStr) ? null : dateStr;
+  render();
+}
+function updateTransport(date, sessionId, value){
+  const s = (records[date]||[]).find(x=>x.id===sessionId); if(!s) return;
+  s.transportCost = Number(value); persistRecords(); render();
+}
+function toggleReimbursed(date, sessionId){
+  const s = (records[date]||[]).find(x=>x.id===sessionId); if(!s) return;
+  s.reimbursed = !s.reimbursed; persistRecords(); render();
+}
+function deleteRecord(date, sessionId){
+  if(!confirm(`${date} の記録（${(records[date]||[]).find(x=>x.id===sessionId)?.locationName||''}）を削除しますか？`)) return;
+  records[date] = (records[date]||[]).filter(x=>x.id!==sessionId);
+  if(records[date].length===0) delete records[date];
+  persistRecords(); render();
+}
+
+function setTab(t){ tab=t; render(); }
+
+// ---------- boot ----------
+function tickClock(){
+  if(tab!=='punch' || showLocForm || editingRecordDate) return;
+  const s = activeSessionToday();
+  if(!s || s.status!=='working') return;
+  const ms = computeWorkMs(s);
+  const el = document.getElementById('clockDisplay');
+  if(el) el.textContent = msToHMS(ms);
+  const loc = locations.find(l=>l.id===s.locationId);
+  const goalHours = projectGoalHours(loc);
+  const percent = goalHours>0 ? Math.min(100, (ms/3600000/goalHours)*100) : 0;
+  const fill = document.querySelector('.progressfill');
+  if(fill) fill.style.width = percent+'%';
+  const cat = document.querySelector('.catwalk');
+  if(cat) cat.style.left = percent+'%';
+  const gl = document.querySelector('.goalline');
+  if(gl) gl.textContent = goalLineText(ms, goalHours, loc?loc.name:'', false);
+}
+// ==== ここから: 3ボタン操作サポート ====
+// Tab=次のボタン/入力欄へフォーカス移動、Enter=決定(クリック)、PageDown=画面スクロール
+// は全部ブラウザ標準の挙動なので、独自のキー処理は基本的に不要。
+// ここでは「毎回innerHTMLを丸ごと描き直す」このアプリの都合上、
+// 再描画のたびにフォーカスが失われてTabが振り出しに戻ってしまう点だけ補助する。
+(function(){
+  function isVisible(el){
+    if(!el || el.disabled) return false;
+    const r = el.getBoundingClientRect();
+    return r.width>0 && r.height>0;
+  }
+  function focusables(){
+    const scope = document.querySelector('.modal') ? '.modal' : '#app';
+    return Array.from(document.querySelectorAll(scope+' button, '+scope+' input, '+scope+' select'))
+      .filter(isVisible);
+  }
+  // render()で何かに元々フォーカスがあった場合だけ、先頭要素に戻す
+  // (フォーカスが無い状態=まだTabで触っていない状態はそのまま何もしない)
+  const originalRender = render;
+  render = function(){
+    const hadFocus = document.activeElement && document.activeElement !== document.body;
+    originalRender();
+    if(hadFocus){
+      requestAnimationFrame(function(){
+        const list = focusables();
+        if(list.length) list[0].focus();
+      });
+    }
+  };
+})();
+// ==== 追加ここまで ====
+
+setInterval(tickClock, 1000);
+setInterval(breakTick, 1000);
+render();
+</script>
+</body>
+</html>
