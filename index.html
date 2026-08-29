@@ -117,14 +117,16 @@
   /* タッチ非対応液晶なので、フォーカス中の要素をはっきり見せる（ボタン操作の目印） */
   #app button:focus-visible,
   #app input:focus-visible,
-  #app select:focus-visible{
+  #app select:focus-visible,
+  #app [tabindex]:focus-visible{
     outline: 3px solid var(--brassDark);
     outline-offset: 2px;
     box-shadow: 0 0 0 5px rgba(224,85,154,0.25);
   }
   /* 画面幅が260px以下＝この液晶そのものの想定。詰めて全部入るようにする */
-  @media (max-width:260px){
-    #app{padding:8px 6px 70px; max-width:none;}
+  @media (max-device-width:260px) and (max-device-height:260px){
+    html,body{width:240px; overflow-x:hidden;}
+    #app{padding:8px 6px 70px; max-width:none; width:240px;}
     header{margin-bottom:6px;}
     .eyebrow{font-size:9px; letter-spacing:1px;}
     nav{gap:3px; margin-bottom:8px;}
@@ -137,7 +139,9 @@
     .metric{padding:6px 7px;}
     .metric .lbl{font-size:8px;}
     .metric .val{font-size:11px;}
-    .projchip{padding:5px 8px; font-size:10px;}
+    .projlist{gap:4px; margin:8px 0;}
+    .projchip{padding:3px 6px; font-size:9px; gap:4px;}
+    .projchip .sq{width:6px; height:6px;}
     .panel{border-radius:10px;}
     table{font-size:9px;}
     th,td{padding:5px 4px;}
@@ -167,6 +171,39 @@ const ICONS = {
   resume:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>',
   end:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
 };
+// 240x240キオスク機かどうかの判定(スマホでは常にfalse)
+const IS_KIOSK = (typeof screen !== 'undefined' && screen.width <= 260 && screen.height <= 260);
+
+// キオスク用: PageDownキーの1回あたりのスクロール量を小さくする(標準だとほぼ1画面丸ごと動いて止めにくいため)
+if (IS_KIOSK) {
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'PageDown') {
+      e.preventDefault();
+      window.scrollBy({ top: 80, left: 0, behavior: 'auto' });
+    }
+  }, true);
+}
+
+// キオスク用: alert()/confirm()はこの画面では文字が見切れて読めず、
+// マウス/タッチも無いため操作不能(詰む)になりうる。
+// 画面内バナー表示に差し替え、confirm()は常に「続行する」扱いにする。
+function kioskBanner(text, color){
+  let b = document.getElementById('kioskBanner');
+  if(!b){
+    b = document.createElement('div');
+    b.id = 'kioskBanner';
+    b.style.cssText = 'position:fixed;top:0;left:0;width:240px;z-index:99999;font-size:9px;padding:3px 4px;text-align:center;color:#fff;word-break:break-all;box-sizing:border-box;';
+    document.body.appendChild(b);
+  }
+  b.style.background = color || '#8A8CA0';
+  b.textContent = text;
+  clearTimeout(b._hideTimer);
+  b._hideTimer = setTimeout(function(){ if(b.parentNode) b.parentNode.removeChild(b); }, 6000);
+}
+if (IS_KIOSK) {
+  window.alert = function(msg){ kioskBanner(String(msg), '#7FB3DC'); };
+  window.confirm = function(msg){ kioskBanner(String(msg), '#7FB3DC'); return true; };
+}
 
 // ---------- storage (localStorage, self-hosted so it actually persists) ----------
 function load(key, fallback){ try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }catch(e){ return fallback; } }
@@ -266,6 +303,43 @@ function importDataFile(event){
     event.target.value = '';
   };
   reader.readAsText(file);
+}
+
+// キオスク用: ~/timecard/import.json を置いてこのボタンを押すと読み込む(ダイアログなし)
+function importFromFixedFile(){
+  function showBanner(text, color){
+    let b = document.getElementById('importStatus');
+    if(!b){
+      b = document.createElement('div');
+      b.id = 'importStatus';
+      b.style.cssText = 'position:fixed;top:0;left:0;width:240px;z-index:99999;font-size:9px;padding:3px 4px;text-align:center;color:#fff;word-break:break-all;box-sizing:border-box;';
+      document.body.appendChild(b);
+    }
+    b.style.background = color;
+    b.textContent = text;
+    clearTimeout(b._hideTimer);
+    b._hideTimer = setTimeout(()=>{ if(b.parentNode) b.parentNode.removeChild(b); }, 6000);
+  }
+  showBanner('import.json 読込中...', '#8A8CA0');
+  fetch('./import.json?ts=' + Date.now())
+    .then(r=>{ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(payload=>{
+      locations = payload.locations || [];
+      records = payload.records || {};
+      Object.keys(records).forEach(date=>{
+        if(!Array.isArray(records[date])){
+          const old = records[date];
+          if(!old.id) old.id = uid();
+          records[date] = [old];
+        }
+      });
+      persistLocations(); persistRecords();
+      render();
+      showBanner('読込OK locations=' + locations.length + ' days=' + Object.keys(records).length, '#4FAE72');
+    })
+    .catch(e=>{
+      showBanner('読込失敗: ' + e.message, '#E8746B');
+    });
 }
 
 // ---------- actions ----------
@@ -421,7 +495,9 @@ function render(){
       <div class="eyebrow">TIME CARD</div>
       <div style="display:flex;gap:6px;">
         <button class="icobtn" title="バックアップを書き出すSAVE" onclick="exportData()">SV</button>
-        <label class="icobtn" style="cursor:pointer; color:" title="バックアップを読み込むLOAD">LD<input type="file" accept="application/json" style="display:none;" onchange="importDataFile(event)"></label>
+        ${IS_KIOSK
+          ? `<button class="icobtn" title="import.jsonを読み込むLOAD" onclick="importFromFixedFile()">LD</button>`
+          : `<label class="icobtn" style="cursor:pointer; color:" title="バックアップを読み込むLOAD">LD<input type="file" accept="application/json" style="display:none;" onchange="importDataFile(event)"></label>`}
       </div>
     </header>`;
 
@@ -590,8 +666,11 @@ function renderPunch(today, todayStr, weekday, suggested){
     } else if(isCurrent){
       cls += ' selected';
     }
-    const onclick = locked ? '' : `onclick="selectedLocId='${l.id}'; render();"`;
-    return `<div class="${cls}" style="${style}" ${onclick}>
+    const clickable = !locked;
+    const onclick = clickable ? `onclick="selectedLocId='${l.id}'; render();"` : '';
+    const onkeydown = clickable ? `onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); selectedLocId='${l.id}'; render();}"` : '';
+    const tabindex = clickable ? 'tabindex="0"' : '';
+    return `<div class="${cls}" style="${style}" ${onclick} ${onkeydown} ${tabindex}>
       <span class="sq" style="background:${isCurrent&&locked?'rgba(255,255,255,0.85)':locColor(l.id)};"></span>${escapeHtml(l.name)}
     </div>`;
   }).join('');
