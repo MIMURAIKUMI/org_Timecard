@@ -175,11 +175,18 @@ const ICONS = {
 const IS_KIOSK = (typeof screen !== 'undefined' && screen.width <= 260 && screen.height <= 260);
 
 // キオスク用: PageDownキーの1回あたりのスクロール量を小さくする(標準だとほぼ1画面丸ごと動いて止めにくいため)
+// さらに、一番下まで到達した状態でもう一度押したら一番上まで戻す(ループ)。
 if (IS_KIOSK) {
   document.addEventListener('keydown', function(e){
     if (e.key === 'PageDown') {
       e.preventDefault();
-      window.scrollBy({ top: 80, left: 0, behavior: 'auto' });
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      if (maxScroll <= 0 || window.scrollY >= maxScroll - 2) {
+        // 既に一番下(またはスクロール不要)なら一番上へループ
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      } else {
+        window.scrollBy({ top: 80, left: 0, behavior: 'auto' });
+      }
     }
   }, true);
 }
@@ -1321,16 +1328,22 @@ function tickClock(){
     return Array.from(document.querySelectorAll(scope+' button, '+scope+' input, '+scope+' select'))
       .filter(isVisible);
   }
-  // render()で何かに元々フォーカスがあった場合だけ、先頭要素に戻す
+  // render()で何かに元々フォーカスがあった場合、再描画後も「同じ並び順で何番目か」を
+  // できるだけ保つ(先頭に戻さない)。要素はinnerHTML総入れ替えで別物になるため、
+  // インデックス(何番目のfocusable要素だったか)だけを引き継ぐ。
   // (フォーカスが無い状態=まだTabで触っていない状態はそのまま何もしない)
   const originalRender = render;
   render = function(){
+    const beforeList = focusables();
+    const activeIdx = document.activeElement ? beforeList.indexOf(document.activeElement) : -1;
     const hadFocus = document.activeElement && document.activeElement !== document.body;
     originalRender();
     if(hadFocus){
       requestAnimationFrame(function(){
         const list = focusables();
-        if(list.length) list[0].focus();
+        if(!list.length) return;
+        const idx = activeIdx >= 0 ? Math.min(activeIdx, list.length - 1) : 0;
+        list[idx].focus();
       });
     }
   };
